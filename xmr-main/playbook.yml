@@ -1,0 +1,10 @@
+---
+- name: Setup Raspberry Pi and Build Monero
+  hosts: all
+  become: true
+  roles:
+    - first_contact
+    - ports_and_firewall
+    - install_monero
+    - install_tor
+    - install_i2p

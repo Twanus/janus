@@ -1,0 +1,31 @@
+---
+- name: Installing i2p on a node
+  become: true
+  block:
+    - name: Copy over i2p-jar for Linux
+      ansible.builtin.copy:
+        src: files/i2pinstall_2.5.0.jar
+        dest: /tmp/i2pinstall_2.5.0.jar
+        mode: '0755'
+        # checksum: 'sha256:61d3720accc6935f255611680b08ba1a414d32daa00d052017630c2424c30069'
+
+    - name: Ensure java is installed
+      ansible.builtin.package:
+        name: openjdk-17-jre
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Ensure java 17 jre is installed on RedHat/CentOS
+      ansible.builtin.package:
+        name: java-17-openjdk 
+        state: present
+      when: ansible_os_family == "RedHat" or ansible_os_family == "CentOS" or ansible_os_family == "Rocky" or ansible_os_family == "Fedora"
+
+    - name: Install i2p on Linux, BSD, Solaris
+      expect:
+        ansible.builtin.command:
+          cmd: java -jar /tmp/i2pinstall_2.5.0.jar -console
+          responses:
+            press 1: 1
+            target directory: /opt/i2p
+            start i2p: y

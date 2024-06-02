@@ -1,0 +1,9 @@
+---
+monero_user: "monero"
+download_path: "/home/{{ monero_user }}"
+
+# Monero download URLs -> this also gets changed dynamicly inside tasks/main.yml
+monero_url: "https://downloads.getmonero.org/cli/linuxarm8"
+hashes_url: "https://www.getmonero.org/downloads/hashes.txt"
+
+monero_dist: "monero-linux-armv8-v0.18.3.3"

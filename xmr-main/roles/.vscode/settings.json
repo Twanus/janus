@@ -1,0 +1,6 @@
+{
+    "ansible.python.interpreterPath": "/home/jacko/.venv/bin/python",
+    "yaml.schemas": {
+        "https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible.json#/$defs/tasks": "file:///home/jacko/Monero/roles/first_contact/tasks/main.yml"
+    }
+}
