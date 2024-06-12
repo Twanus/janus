@@ -1,0 +1,240 @@
+# roles/install_monero/tasks/main.yml
+---
+- name: Setup
+  become: true
+  block:
+    - name: Ensure required packages are installed (RedHat based systems)
+      ansible.builtin.yum:
+        name:
+          - bzip2
+          - lbzip2
+          - tar
+          - unzip
+          - xz
+          - zstd
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Ensure required packages are installed (Debian based systems)
+      ansible.builtin.apt:
+        name:
+          - bzip2
+          - tar
+          - unzip
+          - xz-utils
+          - zstd
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Create Monero group
+      ansible.builtin.group:
+        name: "{{ monero_user }}"
+        state: present
+
+    - name: Create Monero system user account
+      ansible.builtin.user:
+        name: "{{ monero_user }}"
+        system: true
+        create_home: false
+        group: "{{ monero_user }}"
+
+    - name: Create directory for Monero logs
+      ansible.builtin.file:
+        path: /var/log/"{{ monero_user }}"
+        state: directory
+        owner: "{{ monero_user }}"
+        group: "{{ monero_user }}"
+        mode: "0755"
+
+    - name: Create directory for Monero blockchain database
+      ansible.builtin.file:
+        path: /var/lib/monero
+        state: directory
+        owner: "{{ monero_user }}"
+        group: "{{ monero_user }}"
+        mode: "0755"
+
+    - name: Create tmp directory for Monero blockchain database
+      ansible.builtin.file:
+        path: /var/lib/monero
+        state: directory
+        owner: "{{ monero_user }}"
+        group: "{{ monero_user }}"
+        mode: "0755"
+
+    - name: Create Monero configuration file
+      ansible.builtin.file:
+        path: /var/lib/monero/monerod.conf
+        state: touch
+        owner: "{{ monero_user }}"
+        group: "{{ monero_user }}"
+        mode: "0644"
+
+    - name: Set permissions for Monero directories and configuration file
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        recurse: true
+        owner: "{{ monero_user }}"
+        group: "{{ monero_user }}"
+        mode: "0755"
+      loop:
+        - /var/lib/monero
+        - /var/log/monero
+
+- name: Download and verify
+  become: true
+  block:
+    - name: Get the system architecture
+      ansible.builtin.command: uname -m
+      register: architecture
+      
+    - name: Set Monero download URL based on architecture
+      set_fact:
+        monero_dist: >-
+          {{
+            "monero-linux-x64-v0.18.3.3"
+            if architecture.stdout == "x86_64"
+            else "monero-linux-armv8-v0.18.3.3"
+          }}
+        monero_url: >-
+          {{
+            "https://downloads.getmonero.org/cli/monero-linux-x64-v0.18.3.3.tar.bz2"
+            if architecture.stdout == "x86_64"
+            else "https://downloads.getmonero.org/cli/monero-linux-armv8-v0.18.3.3.tar.bz2"
+          }}
+        monero_checksum: >-
+          {{
+            "sha256:47c7e6b4b88a57205800a2538065a7874174cd087eedc2526bee1ebcce0cc5e3"
+            if architecture.stdout == "x86_64"
+            else "sha256:eb3f924c085ae5df85f5bf9ee27faaa20acd309835684e27e3fbb98b9666b649"
+          }}
+
+    - name: Ensure download directory exists
+      ansible.builtin.file:
+        path: "{{ download_path }}"
+        state: directory
+        mode: "0755"
+
+    - name: Download & Verify Monero CLI
+      ansible.builtin.get_url:
+        url: "{{ monero_url }}"
+        dest: "{{ download_path }}"
+        checksum: "{{ monero_checksum }}"
+        mode: "0755"
+        timeout: 60
+
+- name: Extract and install
+  become: true
+  block:
+    - name: Ensure /tmp/monero_extracted directory exists
+      ansible.builtin.file:
+        path: "/tmp/monero_extracted"
+        state: directory
+        mode: "0755"
+
+    - name: Extract Monero CLI
+      ansible.builtin.unarchive:
+        src: "{{ download_path }}/{{ monero_dist }}.tar.bz2"
+        dest: "/tmp/monero_extracted"
+        remote_src: true
+        extra_opts: [--strip-components=1]
+
+    - name: Move Monero binaries to /usr/local/bin
+      ansible.builtin.shell:
+        cmd: "mv /tmp/monero_extracted/* /usr/local/bin/"
+      args:
+        removes: "/tmp/monero_extracted"
+
+    - name: Ensure Monero binaries are executable and have correct ownership
+      ansible.builtin.file:
+        path: "/usr/local/bin/{{ item }}"
+        state: file
+        mode: "0755"
+        owner: "{{ monero_user }}"
+        group: "{{ monero_user }}"
+      with_items:
+        - monerod
+        - monero-wallet-cli
+        - monero-wallet-rpc
+
+- name: Clean Up
+  become: true
+  block:
+    - name: Remove Monero CLI archive
+      ansible.builtin.file:
+        path: "{{ download_path }}/{{ monero_dist }}.tar.bz2"
+        state: absent
+
+    - name: Remove hashes.txt file
+      ansible.builtin.file:
+        path: "{{ download_path }}/hashes.txt"
+        state: absent
+
+- name: Copy Config
+  block:
+    - name: Copy over monerod.conf.j2 template
+      ansible.builtin.template:
+        src: monerod.conf.j2
+        dest: /var/lib/monero/monerod.conf
+        owner: "{{ monero_user }}"
+        group: "{{ monero_user }}"
+        mode: "0644"
+
+    - name: Copy over monerod.service.j2 template
+      ansible.builtin.template:
+        src: monerod.service.j2
+        dest: /etc/systemd/system/monerod.service
+        owner: "{{ monero_user }}"
+        group: "{{ monero_user }}"
+        mode: "0644"
+
+- name: Daemon service
+  become: true
+  block:
+    - name: Reload systemd manager configuration
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Enable monerod service
+      ansible.builtin.systemd:
+        name: monerod
+        enabled: true
+
+    - name: Restart monerod service
+      ansible.builtin.systemd:
+        name: monerod
+        state: started
+      ignore_errors: true
+      register: monerod_restart_result
+
+    - name: Check monerod service status if failed
+      ansible.builtin.command:
+        cmd: systemctl status monerod.service
+      register: monerod_status
+      when: monerod_restart_result.failed
+      ignore_errors: true
+
+    - name: Display monerod service status
+      ansible.builtin.debug:
+        var: monerod_status.stdout_lines
+      when: monerod_restart_result.failed
+      ignore_errors: true
+
+    - name: Check monerod journal logs if failed
+      ansible.builtin.command: journalctl -xeu monerod.service
+      register: monerod_logs
+      when: monerod_restart_result.failed
+      ignore_errors: true
+
+    - name: Display monerod journal logs
+      ansible.builtin.debug:
+        var: monerod_logs.stdout_lines
+      when: monerod_restart_result.failed
+      ignore_errors: true
+
+#    - name: run monerod & start download blockchain (180GB 6/2024)
+#      ansible.builtin.shell:
+#        cmd: "/usr/local/bin/monerod &"
+#      ignore_errors: true
+#      register: monerod_run_result

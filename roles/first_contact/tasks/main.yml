@@ -1,0 +1,44 @@
+---
+- name: Ensure sudo is installed (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name: sudo
+    state: present
+  when: ansible_os_family == "Debian" or ansible_os_family == "Ubuntu" or ansible_os_family == "Raspberry Pi OS"
+
+- name: Ensure sudo is installed (RedHat/CentOS/Rocky/Fedora)
+  ansible.builtin.yum:
+    name: sudo
+    state: present
+  when: ansible_os_family == "RedHat" or ansible_os_family == "CentOS" or ansible_os_family == "Rocky" or ansible_os_family == "Fedora"
+
+- name: Create a user with admin rights
+  ansible.builtin.user:
+    name: "{{ username }}"
+    state: present
+    groups: sudo
+    append: true
+  when: ansible_os_family == "Debian" or ansible_os_family == "Ubuntu" or ansible_os_family == "Raspberry Pi OS"
+
+- name: Add public key to authorized keys
+  ansible.builtin.authorized_key:
+    user: "{{ username }}"
+    state: present
+    key: "{{ lookup('file', '~/.ssh/id_jacko_rsa.pub') }}"
+    exclusive: true
+
+- name: Set the hostname of the system
+  ansible.builtin.hostname:
+    name: "{{ hostname }}"
+
+- name: Update all packages (Debian/Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: true
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian" or ansible_os_family == "Ubuntu"
+
+- name: Update all packages (RedHat/CentOS)
+  ansible.builtin.yum:
+    name: '*'
+    state: latest
+  when: ansible_os_family == "RedHat" or ansible_os_family == "CentOS"

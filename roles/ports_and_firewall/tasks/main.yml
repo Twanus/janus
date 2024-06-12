@@ -1,0 +1,55 @@
+---
+- name: Install UFW)
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian" or ansible_os_family == "Ubuntu" or ansible_os_family == "Raspberry Pi OS"
+
+- name: Ensure EPEL repository is installed (RedHat/CentOS/Rocky/Fedora)
+  ansible.builtin.yum:
+    name: epel-release
+    state: present
+  when: ansible_os_family == "RedHat" or ansible_os_family == "CentOS" or ansible_os_family == "Rocky" or ansible_os_family == "Fedora"
+
+- name: Install UFW (RedHat/CentOS/Rocky/Fedora)
+  ansible.builtin.yum:
+    name: ufw
+    state: present
+  when: ansible_os_family == "RedHat" or ansible_os_family == "CentOS" or ansible_os_family == "Rocky" or ansible_os_family == "Fedora"
+
+- name: Set default to deny incoming traffic
+  community.general.ufw:
+    direction: incoming
+    default: deny
+
+- name: Set default to allow outgoing traffic
+  community.general.ufw:
+    direction: outgoing
+    default: allow
+
+- name: Allow SSH access
+  community.general.ufw:
+    rule: allow
+    name: ssh
+
+- name: Allow monerod p2p port
+  community.general.ufw:
+    rule: allow
+    port: 18080
+    proto: tcp
+
+- name: Allow monerod restricted RPC port
+  community.general.ufw:
+    rule: allow
+    port: 18089
+    proto: tcp
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+    policy: allow
+
+- name: Restart UFW
+  community.general.ufw:
+    state: reloaded

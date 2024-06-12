@@ -1,0 +1,30 @@
+---
+- name: Update packages
+  ansible.builtin.package:
+    name: '*'
+    state: latest
+    update_cache: true
+
+- name: Install Tor
+  ansible.builtin.package:
+    name: tor
+    state: present
+
+- name: Start and enable Tor
+  ansible.builtin.service:
+    name: tor
+    state: started
+    enabled: true
+
+- name: Copy over torrc
+  ansible.builtin.copy:
+    src: torrc
+    dest: /etc/tor/torrc
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Restart Tor
+  ansible.builtin.service:
+    name: tor
+    state: restarted

@@ -1,0 +1,8 @@
+---
+- name: Set monero binaries ownership
+  ansible.builtin.file:
+    path: "/usr/local/bin/{{ binary_name }}"
+    state: file
+    owner: monero
+    group: monero
+    mode: '0755'
