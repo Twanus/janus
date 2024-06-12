@@ -233,8 +233,8 @@
       when: monerod_restart_result.failed
       ignore_errors: true
 
-#    - name: run monerod & start download blockchain (180GB 6/2024)
-#      ansible.builtin.shell:
-#        cmd: "/usr/local/bin/monerod &"
-#      ignore_errors: true
-#      register: monerod_run_result
+    - name: run monerod & start download blockchain (180GB 6/2024)
+      ansible.builtin.shell:
+        cmd: "/usr/local/bin/monerod --config-file /var/lib/monero/monerod.conf --detach"
+      ignore_errors: true
+      register: monerod_run_result
